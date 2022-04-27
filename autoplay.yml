@@ -1,0 +1,94 @@
+---
+- hosts: all
+  tasks:
+  - name: Set Timezone
+    community.general.timezone:
+     name: Europe/Moscow
+  - name: Set Primary
+- hosts: routers
+  tasks: 
+    - name: Install package
+      apt:
+        pkg: 
+          - cowsay
+          - cifs-utils
+          - strongswan
+- hosts: localhost
+  roles:
+    - dnsserver
+    - ntpserver
+
+
+- hosts: 192.168.100.254
+  vars_files:
+    - ./vars.yml
+  tasks:
+    - name: Check Hostname
+      command: hostname
+      register: hostname_rtr_l
+    - name: Set Hostname
+      hostname:
+        name: "{{ router_left }}"
+      when: hostname_rtr_l.stdout != "{{ router_left }}"
+    - name: After change hostname reboot machine
+      reboot:
+      when: hostname_rtr_l.stdout != "{{ router_left }}"
+    - name: Create Nftables
+      template:
+        src: ./nftables_RTR_L.conf
+        dest: /etc/nftables.conf
+      notify:
+        - restart
+  handlers:
+  - name: restart
+    service:
+        name: nftables
+        state: restarted
+
+
+- hosts: 192.168.100.100
+  vars_files:
+    - ./vars.yml
+    - ./secret.yml
+  tasks:
+    - name: Check Hostname
+      command: hostname
+      register: hostname_test_web_l
+    - name: Set Hostname
+      hostname:
+        name: "{{ left_web_server }}"
+      when: hostname_test_web_l.stdout != "{{ left_web_server }}"
+    - name: After change hostname reboot machine
+      reboot:
+      when: hostname_test_web_l.stdout != "{{ left_web_server }}"
+    - name: Create user with password
+      user:
+        name: "{{ username }}"
+        password: "{{ password }}"
+        shell: /bin/bash
+
+
+
+- hosts: 5.5.5.100
+  vars_files:
+    - ./vars.yml
+  tasks:
+    - name: Check Hostname
+      command: hostname
+      register: hostname_rtr_r
+    - name: Set Hostname
+      hostname:
+        name: "{{ router_right }}"
+      when: hostname_rtr_r.stdout != "{{ router_right }}"
+    - name: After change hostname reboot machine
+      reboot:
+      when: hostname_rtr_r.stdout != "{{ router_right }}"
+    - name: Set nftables rules
+      copy:
+        src: ./nftables_RTR_R.conf
+        dest: /etc/nftables.conf
+        mode: "0755"
+    - name: Restart nftables
+      service:
+        name: nftables
+        state: restarted

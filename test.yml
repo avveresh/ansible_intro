@@ -1,0 +1,10 @@
+---
+- hosts: routers
+  tasks:
+    - name: Restart nftables and Apparmor
+      service:
+        name: "{{ service_name }}"
+        state: restarted
+      loop: 
+        - nftables
+        - apparmor 
